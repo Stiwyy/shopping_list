@@ -23,11 +23,9 @@ const initialItems = [
 export default function Page() {
     const [items, setItems] = useState(initialItems);
 
-    // Quick add
     const [quickText, setQuickText] = useState("");
     const [quickOwner, setQuickOwner] = useState("Anna");
 
-    // Dialog state (create + edit)
     const dialogRef = useRef(null);
     const [produkt, setProdukt] = useState("");
     const [status, setStatus] = useState("Offen");
@@ -35,11 +33,9 @@ export default function Page() {
     const [person, setPerson] = useState("");
     const [editingId, setEditingId] = useState(null);
 
-    // Suche (UI-only; LocalStorage/Daten bleiben unverändert)
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
 
-    // Filter + Sortierung
     const [filterOwner, setFilterOwner] = useState("Alle");
     const [filterStatus, setFilterStatus] = useState("Alle");
     const [sortBy, setSortBy] = useState("date"); // date | title | owner | status
@@ -136,7 +132,6 @@ export default function Page() {
         if (e.key === "Enter") addQuick();
     }
 
-    // Suche anwenden (case-insensitive auf Titel + Person)
     function applySearch() {
         setSearch(searchInput);
     }
@@ -208,9 +203,7 @@ export default function Page() {
                         <div className={styles.meta}>
                             <span>👤 {item.owner}</span>
                             <span className={styles.dot}>·</span>
-                            <span>
-                📅 {formatDate(item.date instanceof Date ? item.date : new Date(item.date))}
-              </span>
+                            <span>📅 {formatDate(item.date instanceof Date ? item.date : new Date(item.date))}</span>
                         </div>
                     </div>
 
@@ -242,14 +235,13 @@ export default function Page() {
     return (
         <div className={styles.container}>
             <header className={styles.header}>
-                <div className={styles.headerRow}>
+                <div className={styles.topBar}>
                     <h1 className={styles.title}>Einkaufsliste</h1>
                     <button className={styles.iconBtn} onClick={openNewDialog} aria-label="Neues Produkt">
                         +
                     </button>
                 </div>
 
-                {/* Suche oben */}
                 <div className={styles.searchWrap}>
                     <div className={styles.searchGrid}>
                         <input
@@ -267,7 +259,6 @@ export default function Page() {
                     {search ? <div className={styles.quickHint}>Suche aktiv: „{search}“</div> : null}
                 </div>
 
-                {/* Filter / Sortierung unter der Suche */}
                 <div className={styles.filtersWrap}>
                     <div className={styles.filtersGrid}>
                         <select
@@ -314,7 +305,6 @@ export default function Page() {
                     </div>
                 </div>
 
-                {/* Schnell hinzufügen (bleibt unverändert) */}
                 <div className={styles.quickWrap}>
                     <div className={styles.label}>Schnell hinzufügen</div>
                     <div className={styles.quickGrid}>
@@ -354,13 +344,6 @@ export default function Page() {
                     list
                 )}
             </main>
-
-            <nav className={styles.bottomNav}>
-                <div className={styles.bottomInner}>
-                    <button className={`${styles.navBtn} ${styles.navBtnPrimary}`}>Produkte</button>
-                    <button className={styles.navBtn}>Einstellungen</button>
-                </div>
-            </nav>
 
             <dialog ref={dialogRef} className={styles.dialog}>
                 <div className={styles.dialogHeader}>
