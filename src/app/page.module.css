@@ -3,32 +3,60 @@
 .headerRow{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}
 .title{font-weight:800;font-size:24px;margin:0}
 .iconBtn{border:0;background:#111827;color:#fff;width:38px;height:38px;border-radius:14px;display:grid;place-items:center;cursor:pointer}
+.iconBtn:hover{filter:brightness(1.05)}
+.iconBtn:active{transform:translateY(1px)}
 .dialogForm{display:grid;gap:12px;padding:8px 0}
 .label{font-size:14px;color:#475569;margin-bottom:4px}
-.input, .select, .dateInput{width:100%;height:44px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:16px;background:#f8fafc}
+.input,.select,.dateInput{width:100%;height:44px;border:1px solid #e5e7eb;border-radius:12px;padding:0 12px;font-size:16px;background:#f8fafc}
+.input:focus,.select:focus,.dateInput:focus{border-color:#cbd5e1;outline:none;box-shadow:0 0 0 3px rgba(59,130,246,.15)}
 .select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23677389' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
 .formRow{display:grid;gap:6px}
 .footerRow{display:flex;gap:10px;justify-content:flex-end}
 .btn{height:44px;border-radius:12px;border:1px solid #e5e7eb;background:#111827;color:#fff;padding:0 16px;font-size:16px;cursor:pointer}
+.btn:hover{filter:brightness(1.05)}
+.btn:active{transform:translateY(1px)}
 .btnSecondary{background:#fff;color:#111;border:1px solid #e5e7eb}
 .section{padding:0 16px 96px 16px}
 .card{border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:14px 16px;display:flex;gap:14px;align-items:flex-start;background:#fff}
 .card+.card{margin-top:12px}
-.chk{width:24px;height:24px;border-radius:8px;border:2px solid #cbd5e1;display:grid;place-items:center;cursor:pointer}
+.chk{width:24px;height:24px;border-radius:8px;border:2px solid #cbd5e1;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
 .chkChecked{background:#fef08a;border-color:#facc15}
 .titleRow{font-weight:700;font-size:18px;margin:0;line-height:1.2;word-break:break-word}
 .meta{margin-top:6px;display:flex;align-items:center;gap:12px;color:#64748b;font-size:14px}
 .dot{opacity:.6}
 .strike{text-decoration:line-through;color:#94a3b8}
+
 .quickWrap{padding:0 20px 14px 20px}
 .quickGrid{display:grid;grid-template-columns:1fr 140px auto;gap:8px}
 .quickHint{color:#94a3b8;font-size:12px;margin-top:4px}
+
+/* Filters / Sort */
+.filtersWrap{padding:0 20px 16px 20px;border-top:1px solid #f1f5f9}
+.filtersGrid{display:grid;grid-template-columns:1fr 140px 140px 120px auto;gap:8px}
+@media (max-width: 430px){
+    .filtersGrid{grid-template-columns:1fr 1fr;grid-auto-rows:auto}
+}
+
+/* Card actions (edit/delete) */
+.actions{display:flex;gap:6px;align-items:center}
+.iconSmall{width:34px;height:34px;border-radius:10px;border:1px solid #e5e7eb;background:#f8fafc;display:grid;place-items:center;cursor:pointer}
+.iconSmall:hover{background:#eef2f7}
+.iconDanger{color:#b91c1c;border-color:#fecaca;background:#fff5f5}
+.iconDanger:hover{background:#fee2e2}
+
+/* Bottom nav */
 .bottomNav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.95);border-top:1px solid #e5e7eb}
 .bottomInner{max-width:420px;margin:0 auto;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .navBtn{height:52px;border-radius:16px;border:1px solid #e5e7eb;background:#f8fafc;font-size:16px}
 .navBtnPrimary{background:#fef08a;border-color:#fde047}
+
+/* Dialog */
 .dialog{border:0;border-radius:16px;padding:0;max-width:540px;width:92vw}
 .dialog::backdrop{background:rgba(15,23,42,.35)}
 .dialogHeader{padding:16px 20px;border-bottom:1px solid #f1f5f9;font-weight:700;font-size:18px}
 .dialogBody{padding:14px 20px}
 .dialogFooter{padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:10px}
+
+/* Empty state */
+.empty{border:1px dashed #e5e7eb;border-radius:14px;padding:20px;text-align:center;color:#64748b;background:#fafafa}
+.emptyHint{font-size:12px;margin-top:6px;color:#94a3b8}
