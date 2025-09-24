@@ -1,6 +1,7 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { supabase } from "../lib/supabaseClient";
 
 function formatDate(d) {
     const dd = String(d.getDate()).padStart(2, "0");
@@ -9,122 +10,179 @@ function formatDate(d) {
     return `${dd}.${mm}.${yyyy}`;
 }
 
-const initialItems = [
-    { id: "1", title: "Milch", owner: "Max", date: new Date(2023, 10, 20), done: false },
-    { id: "2", title: "Brot", owner: "Anna", date: new Date(2023, 10, 20), done: false },
-    { id: "3", title: "Eier", owner: "Max", date: new Date(2023, 10, 20), done: true },
-    { id: "4", title: "Käse", owner: "Anna", date: new Date(2023, 10, 20), done: false },
-    { id: "5", title: "Butter", owner: "Max", date: new Date(2023, 10, 20), done: false },
-    { id: "6", title: "Joghurt", owner: "Anna", date: new Date(2023, 10, 20), done: false },
-    { id: "7", title: "Obst", owner: "Max", date: new Date(2023, 10, 20), done: false },
-    { id: "8", title: "Gemüse", owner: "Anna", date: new Date(2023, 10, 20), done: false },
-];
+function mapRowToItem(row) {
+    return {
+        id: row.id,
+        title: row.title ?? "",
+        owner: row.assigned_to ?? "Unknown",
+        date: row.created_at ? new Date(row.created_at) : new Date(),
+        done: !!row.status,
+    };
+}
 
 export default function Page() {
-    const [items, setItems] = useState(initialItems);
+    const [items, setItems] = useState([]);
 
     const [quickText, setQuickText] = useState("");
     const [quickOwner, setQuickOwner] = useState("Anna");
 
     const dialogRef = useRef(null);
-    const [produkt, setProdukt] = useState("");
-    const [status, setStatus] = useState("Offen");
-    const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
+    const [product, setProduct] = useState("");
+    const [status, setStatus] = useState("Open");
+    const [dateStr, setDateStr] = useState(() => new Date().toISOString().slice(0, 10));
     const [person, setPerson] = useState("");
     const [editingId, setEditingId] = useState(null);
 
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
 
-    const [filterOwner, setFilterOwner] = useState("Alle");
-    const [filterStatus, setFilterStatus] = useState("Alle");
-    const [sortBy, setSortBy] = useState("date"); // date | title | owner | status
-    const [sortDir, setSortDir] = useState("desc"); // asc | desc
+    const [filterOwner, setFilterOwner] = useState("All");
+    const [filterStatus, setFilterStatus] = useState("All");
+    const [sortBy, setSortBy] = useState("date");
+    const [sortDir, setSortDir] = useState("desc");
 
-    function toggle(id) {
-        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+    useEffect(() => {
+        loadItems();
+    }, []);
+
+    async function loadItems() {
+        const { data, error } = await supabase
+            .from("items")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Failed to load items:", error);
+            return;
+        }
+        setItems((data || []).map(mapRowToItem));
     }
 
-    function remove(id) {
-        setItems((prev) => prev.filter((i) => i.id !== id));
+    async function toggle(id) {
+        const it = items.find((i) => i.id === id);
+        if (!it) return;
+
+        // Optimistic UI
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+
+        const { error } = await supabase.from("items").update({ status: !it.done }).eq("id", id);
+        if (error) {
+            console.error("Failed to update status:", error);
+            // Rollback
+            setItems((prev) => prev.map((i) => (i.id === id ? { ...i, done: it.done } : i)));
+        }
+    }
+
+    async function remove(id) {
+        const prev = items;
+        setItems((p) => p.filter((i) => i.id !== id));
+
+        const { error } = await supabase.from("items").delete().eq("id", id);
+        if (error) {
+            console.error("Failed to delete item:", error);
+            setItems(prev); // Rollback
+        }
     }
 
     function openNewDialog() {
         setEditingId(null);
-        setProdukt("");
-        setStatus("Offen");
-        setDatum(new Date().toISOString().slice(0, 10));
+        setProduct("");
+        setStatus("Open");
+        setDateStr(new Date().toISOString().slice(0, 10));
         setPerson("");
         dialogRef.current?.showModal();
     }
+
     function openEditDialog(item) {
         setEditingId(item.id);
-        setProdukt(item.title);
-        setStatus(item.done ? "Erledigt" : "Offen");
+        setProduct(item.title);
+        setStatus(item.done ? "Done" : "Open");
         const d = item.date instanceof Date ? item.date : new Date(item.date);
         const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-        setDatum(iso);
+        setDateStr(iso);
         setPerson(item.owner);
         dialogRef.current?.showModal();
     }
+
     function closeDialog() {
         dialogRef.current?.close();
     }
 
-    function saveDialog() {
-        const name = produkt.trim();
+    async function saveDialog() {
+        const name = product.trim();
         if (!name) {
             closeDialog();
             return;
         }
-        const d = new Date(datum);
+        const d = new Date(dateStr);
         const normalizedDate = isNaN(d) ? new Date() : d;
 
         if (editingId) {
-            setItems((prev) =>
-                prev.map((i) =>
-                    i.id === editingId
-                        ? {
-                            ...i,
-                            title: name,
-                            owner: person.trim() || "Unbekannt",
-                            date: normalizedDate,
-                            done: status === "Erledigt",
-                        }
-                        : i
-                )
-            );
-        } else {
-            const newItem = {
-                id: crypto.randomUUID(),
+            // Update existing row (including created_at as editable date for your UI)
+            const updateRow = {
                 title: name,
-                owner: person.trim() || "Unbekannt",
-                date: normalizedDate,
-                done: status === "Erledigt",
+                assigned_to: person.trim() || "Unknown",
+                status: status === "Done",
+                created_at: normalizedDate.toISOString(),
             };
-            setItems((prev) => [newItem, ...prev]);
+            const { data, error } = await supabase
+                .from("items")
+                .update(updateRow)
+                .eq("id", editingId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Error while saving (update):", error);
+            } else if (data) {
+                const mapped = mapRowToItem(data);
+                setItems((prev) => prev.map((i) => (i.id === editingId ? mapped : i)));
+            }
+        } else {
+            // Insert new row
+            const insertRow = {
+                title: name,
+                assigned_to: person.trim() || "Unknown",
+                status: status === "Done",
+                created_at: normalizedDate.toISOString(),
+            };
+            const { data, error } = await supabase.from("items").insert(insertRow).select().single();
+
+            if (error) {
+                console.error("Error while saving (insert):", error?.message, JSON.stringify(error, null, 2));
+            } else if (data) {
+                const mapped = mapRowToItem(data);
+                setItems((prev) => [mapped, ...prev]);
+            }
         }
 
         setEditingId(null);
-        setProdukt("");
-        setStatus("Offen");
-        setDatum(new Date().toISOString().slice(0, 10));
+        setProduct("");
+        setStatus("Open");
+        setDateStr(new Date().toISOString().slice(0, 10));
         setPerson("");
         closeDialog();
     }
 
-    function addQuick() {
+    async function addQuick() {
         const parts = quickText.split(",").map((s) => s.trim()).filter(Boolean);
         if (parts.length === 0) return;
-        const now = new Date();
-        const toAdd = parts.map((p) => ({
-            id: crypto.randomUUID(),
+        const now = new Date().toISOString();
+
+        const toInsert = parts.map((p) => ({
             title: p,
-            owner: quickOwner || "Unbekannt",
-            date: now,
-            done: false,
+            assigned_to: quickOwner || "Unknown",
+            status: false,
+            created_at: now,
         }));
-        setItems((prev) => [...toAdd, ...prev]);
+
+        const { data, error } = await supabase.from("items").insert(toInsert).select();
+        if (error) {
+            console.error("Quick add failed:", error);
+            return;
+        }
+        const mapped = (data || []).map(mapRowToItem);
+        setItems((prev) => [...mapped, ...prev]);
         setQuickText("");
     }
 
@@ -135,13 +193,14 @@ export default function Page() {
     function applySearch() {
         setSearch(searchInput);
     }
+
     function onSearchKey(e) {
         if (e.key === "Enter") applySearch();
     }
 
     const owners = useMemo(() => {
         const set = new Set(items.map((i) => i.owner).filter(Boolean));
-        return ["Alle", ...Array.from(set)];
+        return ["All", ...Array.from(set)];
     }, [items]);
 
     const filteredSortedItems = useMemo(() => {
@@ -151,8 +210,9 @@ export default function Page() {
             const matchesText = q
                 ? (i.title || "").toLowerCase().includes(q) || (i.owner || "").toLowerCase().includes(q)
                 : true;
-            const matchesOwner = filterOwner === "Alle" ? true : i.owner === filterOwner;
-            const matchesStatus = filterStatus === "Alle" ? true : filterStatus === "Erledigt" ? i.done : !i.done;
+            const matchesOwner = filterOwner === "All" ? true : i.owner === filterOwner;
+            const matchesStatus =
+                filterStatus === "All" ? true : filterStatus === "Done" ? i.done : !i.done;
             return matchesText && matchesOwner && matchesStatus;
         });
 
@@ -191,7 +251,7 @@ export default function Page() {
             filteredSortedItems.map((item) => (
                 <article key={item.id} className={styles.card}>
                     <button
-                        aria-label={item.done ? "Abhaken entfernen" : "Als erledigt markieren"}
+                        aria-label={item.done ? "Uncheck" : "Mark as done"}
                         className={`${styles.chk} ${item.done ? styles.chkChecked : ""}`}
                         onClick={() => toggle(item.id)}
                     >
@@ -210,16 +270,16 @@ export default function Page() {
                     <div className={styles.actions}>
                         <button
                             className={`${styles.iconSmall}`}
-                            aria-label="Eintrag bearbeiten"
-                            title="Bearbeiten"
+                            aria-label="Edit item"
+                            title="Edit"
                             onClick={() => openEditDialog(item)}
                         >
                             ✏️
                         </button>
                         <button
                             className={`${styles.iconSmall} ${styles.iconDanger}`}
-                            aria-label="Eintrag löschen"
-                            title="Löschen"
+                            aria-label="Delete item"
+                            title="Delete"
                             onClick={() => remove(item.id)}
                         >
                             🗑️
@@ -236,8 +296,8 @@ export default function Page() {
         <div className={styles.container}>
             <header className={styles.header}>
                 <div className={styles.topBar}>
-                    <h1 className={styles.title}>Einkaufsliste</h1>
-                    <button className={styles.iconBtn} onClick={openNewDialog} aria-label="Neues Produkt">
+                    <h1 className={styles.title}>Shopping List</h1>
+                    <button className={styles.iconBtn} onClick={openNewDialog} aria-label="New product">
                         +
                     </button>
                 </div>
@@ -246,17 +306,17 @@ export default function Page() {
                     <div className={styles.searchGrid}>
                         <input
                             className={styles.input}
-                            placeholder="Suche nach Produkt oder Person..."
+                            placeholder="Search by product or person..."
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
                             onKeyDown={onSearchKey}
-                            aria-label="Suche"
+                            aria-label="Search"
                         />
-                        <button className={styles.btn} onClick={applySearch} aria-label="Suchen">
-                            🔎 Suchen
+                        <button className={styles.btn} onClick={applySearch} aria-label="Search">
+                            🔎 Search
                         </button>
                     </div>
-                    {search ? <div className={styles.quickHint}>Suche aktiv: „{search}“</div> : null}
+                    {search ? <div className={styles.quickHint}>Active search: “{search}”</div> : null}
                 </div>
 
                 <div className={styles.filtersWrap}>
@@ -265,7 +325,7 @@ export default function Page() {
                             className={styles.select}
                             value={filterOwner}
                             onChange={(e) => setFilterOwner(e.target.value)}
-                            aria-label="Filter nach Person"
+                            aria-label="Filter by person"
                         >
                             {owners.map((o) => (
                                 <option key={o} value={o}>
@@ -277,40 +337,40 @@ export default function Page() {
                             className={styles.select}
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
-                            aria-label="Filter nach Status"
+                            aria-label="Filter by status"
                         >
-                            <option>Alle</option>
-                            <option>Offen</option>
-                            <option>Erledigt</option>
+                            <option>All</option>
+                            <option>Open</option>
+                            <option>Done</option>
                         </select>
                         <select
                             className={styles.select}
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            aria-label="Sortieren nach"
+                            aria-label="Sort by"
                         >
-                            <option value="date">Datum</option>
-                            <option value="title">Produkt</option>
+                            <option value="date">Date</option>
+                            <option value="title">Product</option>
                             <option value="owner">Person</option>
                             <option value="status">Status</option>
                         </select>
                         <button
                             className={`${styles.btn} ${styles.btnSecondary}`}
                             onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-                            aria-label="Sortierreihenfolge ändern"
-                            title="Sortierreihenfolge"
+                            aria-label="Toggle sort order"
+                            title="Sort order"
                         >
-                            {sortDir === "asc" ? "⬆️ Aufsteigend" : "⬇️ Absteigend"}
+                            {sortDir === "asc" ? "⬆️ Asc" : "⬇️ Desc"}
                         </button>
                     </div>
                 </div>
 
                 <div className={styles.quickWrap}>
-                    <div className={styles.label}>Schnell hinzufügen</div>
+                    <div className={styles.label}>Quick add</div>
                     <div className={styles.quickGrid}>
                         <input
                             className={styles.input}
-                            placeholder="z. B. Käse, Butter, Joghurt"
+                            placeholder="e.g., Cheese, Butter, Yogurt"
                             value={quickText}
                             onChange={(e) => setQuickText(e.target.value)}
                             onKeyDown={onQuickKey}
@@ -322,23 +382,21 @@ export default function Page() {
                         >
                             <option>Anna</option>
                             <option>Max</option>
-                            <option>Unbekannt</option>
+                            <option>Unknown</option>
                         </select>
                         <button className={styles.btn} onClick={addQuick}>
-                            Hinzufügen
+                            Add
                         </button>
                     </div>
-                    <div className={styles.quickHint}>Tipp: mehrere Artikel mit Komma trennen</div>
+                    <div className={styles.quickHint}>Tip: separate multiple items with commas</div>
                 </div>
             </header>
 
             <main className={styles.section}>
                 {empty ? (
                     <div className={styles.empty}>
-                        <div>Keine Einträge gefunden.</div>
-                        <div className={styles.emptyHint}>
-                            Passe Suche/Filter an oder füge neue Produkte hinzu.
-                        </div>
+                        <div>No items found.</div>
+                        <div className={styles.emptyHint}>Adjust search/filters or add new products.</div>
                     </div>
                 ) : (
                     list
@@ -347,20 +405,20 @@ export default function Page() {
 
             <dialog ref={dialogRef} className={styles.dialog}>
                 <div className={styles.dialogHeader}>
-                    {editingId ? "Eintrag bearbeiten" : "Neues Produkt"}
+                    {editingId ? "Edit item" : "New product"}
                 </div>
                 <div className={styles.dialogBody}>
                     <div className={styles.dialogForm}>
                         <div className={styles.formRow}>
-                            <label className={styles.label} htmlFor="produkt">
-                                Produkt
+                            <label className={styles.label} htmlFor="product">
+                                Product
                             </label>
                             <input
-                                id="produkt"
+                                id="product"
                                 className={styles.input}
-                                placeholder="z. B. Milch, Brot, Eier"
-                                value={produkt}
-                                onChange={(e) => setProdukt(e.target.value)}
+                                placeholder="e.g., Milk, Bread, Eggs"
+                                value={product}
+                                onChange={(e) => setProduct(e.target.value)}
                             />
                         </div>
 
@@ -374,32 +432,32 @@ export default function Page() {
                                 value={status}
                                 onChange={(e) => setStatus(e.target.value)}
                             >
-                                <option>Offen</option>
-                                <option>Erledigt</option>
+                                <option>Open</option>
+                                <option>Done</option>
                             </select>
                         </div>
 
                         <div className={styles.formRow}>
-                            <label className={styles.label} htmlFor="datum">
-                                Erfassungsdatum
+                            <label className={styles.label} htmlFor="date">
+                                Date
                             </label>
                             <input
-                                id="datum"
+                                id="date"
                                 type="date"
                                 className={styles.dateInput}
-                                value={datum}
-                                onChange={(e) => setDatum(e.target.value)}
+                                value={dateStr}
+                                onChange={(e) => setDateStr(e.target.value)}
                             />
                         </div>
 
                         <div className={styles.formRow}>
                             <label className={styles.label} htmlFor="person">
-                                Zuständige Person
+                                Assignee
                             </label>
                             <input
                                 id="person"
                                 className={styles.input}
-                                placeholder="Name eingeben"
+                                placeholder="Enter name"
                                 value={person}
                                 onChange={(e) => setPerson(e.target.value)}
                             />
@@ -408,10 +466,10 @@ export default function Page() {
                 </div>
                 <div className={styles.dialogFooter}>
                     <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={closeDialog}>
-                        Abbrechen
+                        Cancel
                     </button>
                     <button className={styles.btn} onClick={saveDialog}>
-                        {editingId ? "Änderungen speichern" : "Produkt speichern"}
+                        {editingId ? "Save changes" : "Save product"}
                     </button>
                 </div>
             </dialog>
