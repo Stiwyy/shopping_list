@@ -49,7 +49,7 @@ export default function Page() {
         const { data, error } = await supabase
             .from("items")
             .select("*")
-            .order("created_at", { ascending: false });
+            //.order("created_at", { ascending: false });
 
         if (error) {
             console.error("Failed to load items:", error);
